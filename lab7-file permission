@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+ 
+# Functions
+function change_owner {
+  echo "Valid owners are:"
+  echo $(getent passwd | awk -F: '{print $1}')
+  echo -n "Select an owner: "
+  read owner
+  echo -n "Name of the file to change owner of: "
+  read filename
+ 
+  sudo chown $owner $filename
+ 
+  if [[ $? -eq 0 ]]
+  then
+    echo "Owner changed succesfully. Long listing:"
+    echo $(ls -l $filename)
+  else
+    echo "Error occurred.."
+  fi
+}
+ 
+function change_user_group {
+  echo -n "Enter a group name to be created for testing purposes: "
+  read group
+  echo "Adding group..."
+  sudo groupadd $group
+  echo -n "Enter username which will be made member of said group: "
+  read user
+ 
+  echo "Adding user to group..."
+  sudo usermod -a -G $group $user
+ 
+  if [[ $? -eq 0 ]]
+  then
+    echo "Added !"
+    echo "Groups $user is part of:"
+    echo $(groups $user)
+  else
+    echo "Error occurred.."
+  fi
+ 
+}
+ 
+function change_permission {
+  echo "Creating directory named 'permtest'..."
+  mkdir permtest
+  echo "Creating 40 files..."
+  touch permtest/file{1..40}
+ 
+  echo -n "Enter numeric permission: "
+  read perm
+ 
+  chmod -R $perm permtest
+ 
+  echo "Permissions changed ! Long listing of 3 files: "
+  echo $(ls -l permtest | head)
+}
+ 
+function assign_perm {
+  echo "(Case-sensitive) Role ?
+(A)dministrator
+(S)tudent
+(F)aculty"
+  read role
+ 
+  echo -n "File name to be created ?: "
+  read filename
+  touch $filename
+ 
+  case $role in
+    "A") chmod u=rwx $filename;;
+    "S") chmod u=r $filename;;
+    "F") chmod u=rw $filename;;
+  esac
+}
+ 
+function compress_extension {
+  echo "Making directory comptest..."
+  mkdir comptest
+  echo "Adding files f1.txt f2.txt f3.txt person.java array.c code.java test.java..."
+  cd comptest && touch f1.txt f2.txt f3.txt person.java array.c code.java test.java && cd ..
+ 
+  extensions=( $(ls -X comptest | egrep -o "[.]\w+" | uniq) )
+ 
+  for i in ${extensions[@]}
+  do
+    tar -cvf comptest/${i:1}.tar comptest/*$i
+  done
+}
+ 
+function menu {
+  clear
+  echo "
+1. Change ownership of file
+2. Change group of user
+3. Recursively assign file permission
+4. Assign file permission according to role
+5. Group and compress file based on extension
+6. Archive files not accessed for past 3 months
+7. Move files starting with a specific character to collection.tar archive
+8. Compress files from current directory consuming more than 1 gb
+9. Group & compress file based on file permissions.
+10. Exit"
+ 
+  read response
+ 
+  case $response in
+    1) change_owner;;
+    2) change_user_group;;
+    3) change_permission;;
+    4) assign_perm;;
+    5) compress_extension;;
+    10) exit;;
+  esac
+ 
+  read -n 1 -p"Enter any key to continue.."
+}
+ 
+# Main driver
+while [[ true ]]
+do
+  menu
+done
