@@ -2,84 +2,70 @@ echo "Name: Maddi Abhilash"
 echo "Reg.No: 1947234"
 while true
 do
-echo "1. Demonstrate the commands to change the ownership of a file."
-echo "2. Demonstrate the commands to change the group of user"
-echo "3. Demonstrate the recursive option to assign file permission."
-echo "4. create a shell script (Permission.sh) to assign the file privileges at the time of creating a file based on the Roles as mentioned below. (Use switch case)"
-echo "FILE		FILE PERMISSION"
-echo "Administrator	R W X"
-echo "Student		R – –"
-echo "Faculty 	        R W –"
-echo "5. shell script to group and compress the file based on their file extension."
-echo "6. shell script to archive the files which are not accessed for past three months."
-echo "7. Create a compressed file called Collection.tar and move all the files starting with a specific character to the directory Collection.tar"
-echo "8. Compress the files from the current directory which consume more than 1GB"
-echo "9. Group and compress the files based on their file permission.(For example compress the file with ‘read’ only/’read&write’/’read,write&execute’)"
-echo "10. EXIT"
+echo ""
+echo ""
+echo "1. Write a shell program to find the number of unique words and vowels in a file along with line number. "
+echo "2. shell script to display the frequency of occurrence of each character present in the text document and display the character which has the maximum frequency of occurrences and store it in a separate fil"
+echo "3. Write a shell script to replace the string Christ University as CHRIST (Deemed to be University) in the given text document."
+echo "4. EXIT"
 echo "Enter your choice"
 read choice
 case $choice in
-   1) cd 
-      cd /tmp
-      echo "total files and their owners"
-      ls -l
-      echo "Enter the file name to change the owner"
-      read file
-      echo "enter new owner name"
-      read owner
-      sudo chown $owner $file
-      echo "after change the owner of file"
-      ls -l 
+   1) echo -n "enter the file name:"
+      read fname
+      echo "these are the unique words:"
+      grep -oEn '\w+' $fname | sort | uniq
+      echo -n "the the total uniq words are:"
+      grep -oE '\w+' $fname | sort | uniq | wc -l
+      echo "the vowels along with the line number:"
+      grep -on [aeiouAEIOU] $fname 
+      echo -n "the the total vowels are:"
+      grep -o [aeiouAEIOU] $fname | wc -l
       ;;
-   2) echo -n "Enter a group name to be created:"
-      read group
-      sudo groupadd $group
-      echo -n "Enter username which will be made member of $group: "
-      read user
-      sudo usermod -a -G $group $user
-      echo "$user is part of:"
-      groups $user
+   2) echo "enter the file name:"
+      read fname
+      echo -n "enter the seperate file name to store character and their occurences:"
+      read sep
+      largest=0
+      for ch in {a..z}
+      do 
+         echo "$ch - `grep -io "$ch" $fname | wc -l`"
+         echo "$ch - `grep -io "$ch" $fname | wc -l`">>$sep
+         chcount=`grep -io "$ch" $fname | wc -l`
+         if [[ $chcount -ge $largest ]]
+         then
+               largest=$chcount
+         else
+             continue
+         fi
+      done
+     #echo "$largest"
+      for ch in {a..z}
+      do
+         if [[ `grep -io "$ch" $fname | wc -l` -eq $largest ]]
+         then
+              echo "the $largest(largest) occurence of character is:$ch"
+         fi
+       done
       ;;
-   3)echo "enter the directory name where you want create files"
-     read dir
-     mkdir $dir
-     echo "Creating 10 files named test1.txt,test2.txt,......test10.txt"
-     touch dir/test{1..10}.txt
-     ls -l dir
-     echo -n "Enter the absolute value of permission: "
-     read per
-     chmod -R $per dir 
-     echo "after Permissions change: "
-     ls -l dir 
-     ;;
-   4) echo "Enter file you want create and change the permission for that file"
-      read file
-      touch $file
-      echo "1. Admin"
-      echo "2. Student"
-      echo "3. Faculty"
-      echo -n "Enter your choice: "
-      read ch
-      case $ch in
-         1)chmod u=rwx $file
-           ;;
-         2)chmod u=r $file
-           ;;
-         3)chmod u=rw $file
-           ;;
-         *)echo "invalid choice"
-           ;;
-       esac
+   3) echo -n "enter the file name:"
+      read fname
+      echo -n "Enter the string which is going to be replaced:"
+      read old
+      echo -n "enter the new string which is going to take place of old string:"
+      read new
+      if [[ `grep "$old" $fname` ]]
+      then
+         echo "string found"
+         echo ""
+         sed -io "s/$old/$new/g" $fname
+         cat $fname
+      else 
+         echo "string not found"
+      fi
+      echo ""
       ;;
-   5)
-      ;;
-   6) 
-      ;;
-   7) 
-      ;;
-   8);;
-   9);;
-   10) break
+   4) break
      ;;
    *) echo "Invalid Choice"
      ;;
