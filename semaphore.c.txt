@@ -1,0 +1,244 @@
+/*
+ * IPC.c  - using a semaphore to synchronize access to a shared memory segment.Adding 4 students in a size of 5 Critical section is locked.
+ */
+
+#include <stdio.h>	 /* standard I/O routines.               */
+#include <sys/types.h>   /* various type definitions.            */
+#include <sys/ipc.h>     /* general SysV IPC structures          */
+#include <sys/shm.h>	 /* semaphore functions and structs.     */
+#include <sys/sem.h>	 /* shared memory functions and structs. */
+#include <unistd.h>	 /* fork(), etc.                         */
+#include <wait.h>	 /* wait(), etc.                         */
+#include <time.h>	 /* nanosleep(), etc.                    */
+#include <stdlib.h>	 /* rand(), etc.                         */
+#include <string.h>
+#define SEM_ID    250	 /* ID for the semaphore.               */
+
+/* define a structure to be used in the given shared memory segment. */
+struct student {
+    char fname[30];
+    char lname[30];
+    char nationality[30];
+    int register_num;
+};
+
+/*
+ * function: random_delay. delay the executing process for a random number
+ *           of nano-seconds.
+ * input:    none.
+ * output:   none.
+ */
+void random_delay()
+{
+    static int initialized = 0;
+    int random_num;
+    struct timespec delay;            /* used for wasting time. */
+
+    if (!initialized) {
+	srand(time(NULL));
+	initialized = 1;
+    }
+
+    random_num = rand() % 10;
+    delay.tv_sec = 0;
+    delay.tv_nsec = 10*random_num;
+    nanosleep(&delay, NULL);
+}
+
+/*
+ * function: sem_lock. locks the semaphore, for exclusive access to a resource.
+ * input:    semaphore set ID.
+ * output:   none.
+ */
+void sem_lock(int sem_set_id)
+{
+    /* structure for semaphore operations.   */
+    struct sembuf sem_op;
+
+    /* wait on the semaphore, unless it's value is non-negative. */
+    sem_op.sem_num = 0;
+    sem_op.sem_op = -1;
+    sem_op.sem_flg = 0;
+    semop(sem_set_id, &sem_op, 1);
+}
+
+/*
+ * function: sem_unlock. un-locks the semaphore.
+ * input:    semaphore set ID.
+ * output:   none.
+ */
+void sem_unlock(int sem_set_id)
+{
+    /* structure for semaphore operations.   */
+    struct sembuf sem_op;
+
+    /* signal the semaphore - increase its value by one. */
+    sem_op.sem_num = 0;
+    sem_op.sem_op = 1;   /* <-- Comment 3 */
+    sem_op.sem_flg = 0;
+    semop(sem_set_id, &sem_op, 1);
+}
+
+/*
+ * function: add_student. adds a new student to the students array in the
+ *           shard memory segment. Handles locking using a semaphore.
+ * input:    semaphore id, pointer to students counter, pointer to
+ *           students array, data to fill into student.
+ * output:   none.
+ */
+void add_student(int sem_set_id, int* students_num, struct student* students,
+	    char* fname, char* lname, char* nationality,
+	    int register_num)
+{
+    sem_lock(sem_set_id);
+    strcpy(students[*students_num].fname, fname);
+    strcpy(students[*students_num].lname, lname);
+    strcpy(students[*students_num].nationality, nationality);
+    students[*students_num].register_num = register_num;
+    (*students_num)++;
+    sem_unlock(sem_set_id);
+}
+
+/*
+ * function: do_child. runs the child process's code, for populating
+ *           the shared memory segment with data.
+ * input:    semaphore id, pointer to students counter, pointer to
+ *           students array.
+ * output:   none.
+ */
+void do_child(int sem_set_id, int* students_num, struct student* students)
+{
+    add_student(sem_set_id, students_num, students,
+		"Mohammed", "Mueen", "Indian", 1947241);
+    random_delay();
+    add_student(sem_set_id, students_num, students,
+		"Clint", "Abe", "American", 784510);
+    random_delay();
+    add_student(sem_set_id, students_num, students,
+		"Mark", "Peter", "Canadian", 1458748);
+    random_delay();
+    add_student(sem_set_id, students_num, students,
+		"Clement", "P", "Indian", 154244);
+}
+
+/*
+ * function: do_parent. runs the parent process's code, for reading and
+ *           printing the contents of the 'students' array in the shared
+ *           memory segment.
+ * input:    semaphore id, pointer to students counter, pointer to
+ *           students array.
+ * output:   printout of students array contents.
+ */
+void do_parent(int sem_set_id, int* students_num, struct student* students)
+{
+    int i, num_loops;
+
+    for (num_loops=0; num_loops < 5; num_loops++) {
+        /* now, print out the countries data. */
+        sem_lock(sem_set_id);
+        printf("---------------------------------------------------\n");
+        printf("Number Of Students: %d\n", *students_num);
+        for (i=0; i < (*students_num); i++) {
+            printf("Student %d:\n", i+1);
+            printf("  First name: %s:\n", students[i].fname);
+            printf("  Last name: %s:\n", students[i].lname);
+            printf("  Nationality: %s:\n", students[i].nationality);
+            printf("  Register Number: %d:\n", students[i].register_num);
+        }
+        sem_unlock(sem_set_id);
+	random_delay();
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    printf("Mohammed Mueen\n");
+    printf("1947241\n");
+    int sem_set_id;            /* ID of the semaphore set.           */
+    union semun {              /* semaphore value, for semctl().     */
+                int val;
+                struct semid_ds *buf;
+                ushort * array;
+        } sem_val;    
+    int shm_id;	      	       /* ID of the shared memory segment.   */
+    char* shm_addr; 	       /* address of shared memory segment.  */
+    int* students_num;        /* number of Students in shared mem. */
+    struct student* students; /* Students array in shared mem.     */
+    struct shmid_ds shm_desc;
+    int rc;		       /* return value of system calls.      */
+    pid_t pid;		       /* PID of child process.         */
+
+    /* create a semaphore set with ID 250, with one semaphore   */
+    /* in it, with access only to the owner.                    */
+    sem_set_id = semget(SEM_ID, 1, IPC_CREAT | 0600);
+    if (sem_set_id == -1) 
+    {
+	perror("main: semget");
+	exit(1);
+    }
+
+    /* intialize the first (and single) semaphore in our set to '1'. */
+    sem_val.val = 1;
+    rc = semctl(sem_set_id, 0, SETVAL, sem_val);
+    if (rc == -1) 
+    {
+	perror("main: semctl");
+	exit(1);
+    }
+
+    /* allocate a shared memory segment with size of 2048 bytes. */
+    shm_id = shmget(100, 2048, IPC_CREAT | IPC_EXCL | 0600);
+    if (shm_id == -1) 
+    {
+        perror("main: shmget: ");/*shmget() returns the identifier of the System V shared memory segment
+       associated with the value of the argument key*/
+        exit(1);
+    }
+
+    /* attach the shared memory segment to our process's address space. */
+    shm_addr = shmat(shm_id, NULL, 0);
+    if (!shm_addr) { /* operation failed. */
+        perror("main: shmat: ");
+        exit(1);
+    }
+
+    /* create a students index on the shared memory segment. */
+    students_num = (int*) shm_addr;
+    *students_num = 0;
+    students = (struct student*) ((void*)shm_addr+sizeof(int));
+
+    /* fork-off a child process that'll populate the memory segment. */
+    pid = fork();
+    switch (pid) {
+	case -1:
+	    perror("fork: ");
+	    exit(1);
+	    break;
+	case 0:
+	    do_child(sem_set_id, students_num, students);
+	    exit(0);
+	    break;
+	default:
+	    do_parent(sem_set_id, students_num, students);
+	    break;
+    }
+
+    /* wait for child process's terination. */
+    {
+        int child_status;
+
+        wait(&child_status);
+    }
+
+    /* detach the shared memory segment from our process's address space. */
+    if (shmdt(shm_addr) == -1) {
+        perror("main: shmdt: ");
+    }
+
+    /* de-allocate the shared memory segment. */
+    if (shmctl(shm_id, IPC_RMID, &shm_desc) == -1) {
+        perror("main: shmctl: ");
+    }
+
+    return 0;
+}
